@@ -92,7 +92,7 @@ internal sealed class CompanionAnimationPolicy
     }
     internal CompanionAnimationRule Choose(string pool, CompanionAnimationContext context, Random random)
     {
-        var weighted = Rules.Where(r => r.Pool == pool).Select(r => (Rule: r, Weight: Weight(r, context))).Where(r => r.Weight > 0).ToArray();
+        var weighted = Rules.Where(r => pool == "Automatic" ? r.Pool is "Idle" or "Event" : r.Pool == pool).Select(r => (Rule: r, Weight: Weight(r, context))).Where(r => r.Weight > 0).ToArray();
         if (weighted.Length == 0) throw new InvalidOperationException("动画池为空：" + pool);
         var point = random.NextDouble() * weighted.Sum(r => r.Weight);
         foreach (var entry in weighted) { point -= entry.Weight; if (point < 0) return entry.Rule; }

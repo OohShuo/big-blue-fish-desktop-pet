@@ -1,4 +1,5 @@
 """Run the published application on a private X server and close it via WM_DELETE_WINDOW."""
+import json
 import ctypes as C
 import os
 from pathlib import Path
@@ -21,6 +22,8 @@ class Client(C.Structure):
 class Event(C.Union):
     _fields_ = [('client', Client), ('pad', C.c_long * 24)]
 with tempfile.TemporaryDirectory(prefix='bigbluefish-ui-') as temp:
+    if os.environ.get('BIGBLUEFISH_TEST_HIGH_DEFINITION') == '1':
+        (Path(temp) / 'preferences.json').write_text(json.dumps({'SoftwareHighDefinition': True}))
     server = subprocess.Popen(['Xvfb', '-displayfd', '1', '-screen', '0', '1280x800x24', '-nolisten', 'tcp'], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
     app = None
     display = None
@@ -51,6 +54,9 @@ with tempfile.TemporaryDirectory(prefix='bigbluefish-ui-') as temp:
             out = Path(os.environ.get('BIGBLUEFISH_ARTIFACT_DIR', str(root / 'build'))) / 'ui-smoke.png'
             out.parent.mkdir(parents=True, exist_ok=True)
             subprocess.run(['import', '-display', ':' + number, '-window', 'root', str(out)], check=True)
+            # Allow startup to finish and the merged automatic pool to start.
+            time.sleep(5)
+            windows()
             # Send the standard WM close message. The pet must play its farewell and exit.
             display = x.XOpenDisplay((':' + number).encode())
             event = Event()

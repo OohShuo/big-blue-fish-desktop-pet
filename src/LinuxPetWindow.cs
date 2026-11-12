@@ -20,7 +20,6 @@ internal sealed partial class LinuxPetWindow : Window
     readonly LinuxBubble bubbleFrame;
     readonly Mutex mutex;
     string phase = "Startup", fullText = "";
-    DateTime nextEvent = DateTime.UtcNow.AddSeconds(40);
     DateTime bubbleUntil = DateTime.MaxValue;
     bool closed, exitReady, hidden, fullscreenHidden, dragging, dragged, greetingNoticeActive;
     PixelPoint dragOrigin, windowOrigin, moveOrigin;
@@ -95,14 +94,14 @@ internal sealed partial class LinuxPetWindow : Window
         {
             if (phase == "Exit") return;
             if (!dragging) return; dragging = false; e.Pointer.Capture(null); Clamp(); Save();
-            if (dragged) { Idle(); }
+            if (dragged) { QueueAutomatic(); }
             else
             {
                 Play(policy.Choose("Click", Context(), random), "Click");
             }
             e.Handled = true;
         };
-        PointerCaptureLost += (_, _) => { if (dragging) { dragging = false; Idle(); } };
+        PointerCaptureLost += (_, _) => { if (dragging) { dragging = false; QueueAutomatic(); } };
         Closing += (_, e) =>
         {
             Save();
@@ -137,23 +136,35 @@ internal sealed partial class LinuxPetWindow : Window
         if (phase == "Startup" && nextPhase != "Startup") EndWelcome();
 
         phase = nextPhase;
+        player.SoftwareHighDefinition = Preferences.SoftwareHighDefinition;
         player.Play(Path.Combine(AppContext.BaseDirectory, "assets/fish", rule.File), mirror, Finished,
             nextPhase == "Drag" ? 1.5 : 0, nextPhase == "Drag" ? 6 : null, rule.Pool == "Greeting" ? 1.5 : 1);
     }
-    void Idle()
+    void QueueAutomatic()
     {
-        if (!Preferences.LowPowerAnimation) { PlayIdle(); return; }
-        ScheduleLowPowerIdle();
+        if (closed || phase == "Exit" || dragging || hidden || fullscreenHidden || settings != null) return;
+        if (!Preferences.LowPowerAnimation) { PlayAutomatic(); return; }
+        if (animationActive) return;
+        ScheduleLowPowerPause();
     }
-    void PlayIdle() => Play(policy.Choose("Idle", Context(), random), "Idle");
-    void ScheduleLowPowerIdle()
+    void PlayAutomatic()
+    {
+        if (closed || phase == "Exit" || dragging || hidden || fullscreenHidden || settings != null) return;
+        var now = DateTime.Now;
+        if (now.Hour == 23 && Preferences.LastBrushDate != now.ToString("yyyy-MM-dd")) {
+            Preferences.LastBrushDate = now.ToString("yyyy-MM-dd"); Save();
+            Play(policy.Find("晨间刷牙"), "Daily"); return;
+        }
+        PlayAutomaticClip(policy.Choose("Automatic", Context(), random));
+    }
+    void ScheduleLowPowerPause()
     {
         CancelLowPowerHold();
         var hold = new CancellationTokenSource();
         lowPowerHold = hold;
-        _ = HoldThenIdle(hold);
+        _ = HoldThenAutomatic(hold);
     }
-    async Task HoldThenIdle(CancellationTokenSource hold)
+    async Task HoldThenAutomatic(CancellationTokenSource hold)
     {
         try { await Task.Delay(TimeSpan.FromSeconds(Preferences.LowPowerIdleSeconds), hold.Token); }
         catch (OperationCanceledException) { return; }
@@ -162,7 +173,7 @@ internal sealed partial class LinuxPetWindow : Window
             if (lowPowerHold != hold) return;
             lowPowerHold = null; hold.Dispose();
             if (closed || hidden || fullscreenHidden || dragging || settings != null || animationActive || !Preferences.LowPowerAnimation) return;
-            PlayIdle();
+            PlayAutomatic();
         });
     }
     void CancelLowPowerHold()
@@ -176,7 +187,7 @@ internal sealed partial class LinuxPetWindow : Window
     {
         if (closed || animationActive || dragging || hidden || fullscreenHidden || settings != null || phase == "Exit") return;
         CancelLowPowerHold();
-        PlayIdle();
+        PlayAutomatic();
     }
     void Finished()
     {
@@ -184,19 +195,17 @@ internal sealed partial class LinuxPetWindow : Window
 
         if (closed) return;
         if (phase == "Exit") { CloseImmediately(); return; }
-        if (phase == "Drag") return;
+        if (phase == "Drag") { if (!dragging) QueueAutomatic(); return; }
         if (phase == "Outbound" && moveRule != null) { Position = new((int)moveEnd, Position.Y); Play(policy.Choose("Idle", Context(), random), "BetweenMoves"); return; }
         if (phase == "BetweenMoves" && moveRule != null) { moveStart = Position.X; moveEnd = moveOrigin.X; Play(moveRule, "Return", !moveMirrored); return; }
         if (phase == "Return") { Position = new(moveOrigin.X, Position.Y); moveRule = null; }
-        if (phase == "Startup") { EndWelcome(); nextEvent = DateTime.UtcNow.AddSeconds(Preferences.AnimationIntervalSeconds); }
-        if (dragging || hidden || fullscreenHidden || settings != null) { Idle(); return; }
-        var now = DateTime.Now;
-        if (now.Hour == 23 && Preferences.LastBrushDate != now.ToString("yyyy-MM-dd")) { Preferences.LastBrushDate = now.ToString("yyyy-MM-dd"); Save(); Play(policy.Find("晨间刷牙"), "Daily"); return; }
-        if (DateTime.UtcNow >= nextEvent) { nextEvent = DateTime.UtcNow.AddSeconds(Preferences.AnimationIntervalSeconds); Event(policy.Choose("Event", Context(), random)); } else Idle();
+        if (phase == "Startup") EndWelcome();
+        if (dragging || hidden || fullscreenHidden || settings != null) return;
+        QueueAutomatic();
     }
-    void Event(CompanionAnimationRule rule)
+    void PlayAutomaticClip(CompanionAnimationRule rule)
     {
-        if (rule.MoveKind == null) { Play(rule, "Event"); return; }
+        if (rule.MoveKind == null) { Play(rule, "Automatic"); return; }
         moveRule = rule; moveOrigin = Position; moveStart = Position.X;
         Position = new(Position.X - (int)(70 * Preferences.Scale * DesktopScaling), Position.Y); Clamp(); moveEnd = Position.X;
         if (Math.Abs(moveEnd - moveStart) < 15 * DesktopScaling) { Position = new((int)(moveStart + 70 * Preferences.Scale * DesktopScaling), Position.Y); Clamp(); moveEnd = Position.X; }
@@ -270,11 +279,7 @@ internal sealed partial class LinuxPetWindow : Window
         player.Paused = hidden || fullscreenHidden;
         if (hidden || fullscreenHidden) return;
         if (DateTime.UtcNow >= bubbleUntil) bubbleWindow.Hide();
-        if (!animationActive && !dragging && settings == null && DateTime.UtcNow >= nextEvent)
-        {
-            nextEvent = DateTime.UtcNow.AddSeconds(Preferences.AnimationIntervalSeconds);
-            Event(policy.Choose("Event", Context(), random));
-        }
+
     }
     void OpenMenu()
     {

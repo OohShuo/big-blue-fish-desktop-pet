@@ -8,7 +8,7 @@ internal sealed class CompanionPreferences
     public double Scale { get; set; } = 1;
     public double BubbleScale { get; set; } = 1;
     public int BubbleDurationIndex { get; set; } = 3;
-    public int AnimationIntervalSeconds { get; set; } = 40;
+    public bool SoftwareHighDefinition { get; set; }
     public bool LowPowerAnimation { get; set; }
     public int LowPowerIdleSeconds { get; set; } = 15;
     public int BreakfastHour { get; set; } = 8;
@@ -32,7 +32,6 @@ internal sealed class CompanionPreferences
                 value.BubbleScale = double.IsFinite(value.BubbleScale) ? Math.Clamp(value.BubbleScale, .5, 2) : 1;
                 if (value.Left.HasValue && !double.IsFinite(value.Left.Value)) value.Left = null;
                 if (value.Top.HasValue && !double.IsFinite(value.Top.Value)) value.Top = null;
-                value.AnimationIntervalSeconds = Math.Clamp(value.AnimationIntervalSeconds, 30, 300);
                 value.LowPowerIdleSeconds = Math.Clamp(value.LowPowerIdleSeconds, 3, 120);
                 value.BreakfastHour = Math.Clamp(value.BreakfastHour, 0, 23);
                 value.LunchHour = Math.Clamp(value.LunchHour, 0, 23);

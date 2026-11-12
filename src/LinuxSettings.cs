@@ -47,8 +47,23 @@ internal sealed partial class LinuxPetWindow
         var duration = new ComboBox { ItemsSource = CompanionPreferences.BubbleDurationLabels, SelectedIndex = Preferences.BubbleDurationIndex, HorizontalAlignment = HorizontalAlignment.Stretch };
         duration.SelectionChanged += (_, _) => { if (duration.SelectedIndex < 0) return; Preferences.BubbleDurationIndex = duration.SelectedIndex; ResetDwell(); Save(); };
         body.Children.Add(duration);
+        body.Children.Add(new TextBlock { Text = "软件解码画质" });
+        var quality = new ComboBox {
+            ItemsSource = new[] { "低清（640×360，24 帧）", "高清（1280×720，60 帧）" },
+            SelectedIndex = Preferences.SoftwareHighDefinition ? 1 : 0,
+            HorizontalAlignment = HorizontalAlignment.Stretch
+        };
+        quality.SelectionChanged += (_, _) => {
+            if (quality.SelectedIndex < 0) return;
+            Preferences.SoftwareHighDefinition = quality.SelectedIndex == 1;
+            Save();
+        };
+        body.Children.Add(quality);
+        body.Children.Add(new TextBlock {
+            Text = "下一个动作起生效。高清软件解码会增加 CPU 占用；硬件解码始终使用高清素材。",
+            TextWrapping = TextWrapping.Wrap, Foreground = Brushes.SlateGray
+        });
         Heading("动作与作息");
-        Slider("动作间隔（秒）", Preferences.AnimationIntervalSeconds, 30, 300, 1, value => { Preferences.AnimationIntervalSeconds = (int)value; nextEvent = DateTime.UtcNow.AddSeconds(value); });
         Toggle("低功耗动画（播放后暂停解码）", Preferences.LowPowerAnimation, value => { Preferences.LowPowerAnimation = value; if (!value) { CancelLowPowerHold(); ResumeAutomaticIfIdle(); } });
         Slider("低功耗静止时长（秒）", Preferences.LowPowerIdleSeconds, 3, 120, 1, value => Preferences.LowPowerIdleSeconds = (int)value);
         Slider("早餐时间（时）", Preferences.BreakfastHour, 0, 23, 1, value => Preferences.BreakfastHour = (int)value);
@@ -69,7 +84,7 @@ internal sealed partial class LinuxPetWindow
             Background = new SolidColorBrush(Color.FromRgb(247, 248, 251)),
             Content = new ScrollViewer { Content = new Border { Padding = new Thickness(28), Child = body } }
         };
-        settings.Closed += (_, _) => { settings = null; Save(); nextEvent = DateTime.UtcNow.AddSeconds(Preferences.AnimationIntervalSeconds); ResumeAutomaticIfIdle(); };
+        settings.Closed += (_, _) => { settings = null; Save(); ResumeAutomaticIfIdle(); };
         settings.Show(); settings.Activate();
     }
 }

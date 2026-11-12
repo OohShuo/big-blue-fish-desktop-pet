@@ -100,7 +100,7 @@ internal sealed class CompanionMediaStream : IDisposable
     internal int Width { get; }
     internal int Height { get; }
     internal bool Hardware { get; }
-    internal string Description => Hardware ? "GPU VP9 + alpha" : "CPU VP9 + alpha (24 fps)";
+    internal string Description => Hardware ? "GPU VP9 + alpha" : $"CPU VP9 + alpha ({Width}×{Height})";
     internal CompanionMediaStream(string file, bool hardware, int width, int height, double start, double? end, double rate)
     {
         CompanionMedia.Initialize(); Hardware = hardware; Width = width; Height = height;

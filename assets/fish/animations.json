@@ -15,7 +15,7 @@
     "Id": "东张西望",
     "File": "东张西望.webm",
     "Pool": "Event",
-    "Weight": 1000
+    "Weight": 100
   },
   {
     "Id": "中秋赏月吃月饼",
@@ -31,7 +31,7 @@
     "Id": "优雅女仆舞",
     "File": "优雅女仆舞.webm",
     "Pool": "Event",
-    "Weight": 300
+    "Weight": 100
   },
   {
     "Id": "余额-分文不剩",
@@ -67,7 +67,7 @@
     "Id": "余额-钱袋满溢",
     "File": "余额-钱袋满溢.webm",
     "Pool": "Event",
-    "Weight": 30
+    "Weight": 100
   },
   {
     "Id": "偷吃零食被抓住",
@@ -105,7 +105,7 @@
     "Id": "动物环绕",
     "File": "动物环绕.webm",
     "Pool": "Event",
-    "Weight": 30
+    "Weight": 100
   },
   {
     "Id": "原地专心玩魔方",
@@ -138,7 +138,7 @@
     "Id": "原地漂浮踏步",
     "File": "原地漂浮踏步.webm",
     "Pool": "Event",
-    "Weight": 1000
+    "Weight": 100
   },
   {
     "Id": "原地跳跃抓碎头顶物品",
@@ -237,7 +237,7 @@
     "Id": "吃白饭",
     "File": "吃白饭.webm",
     "Pool": "Event",
-    "Weight": 1000
+    "Weight": 100
   },
   {
     "Id": "吃粽子",
@@ -255,7 +255,7 @@
     "Id": "吃糖葫芦",
     "File": "吃糖葫芦.webm",
     "Pool": "Event",
-    "Weight": 30
+    "Weight": 100
   },
   {
     "Id": "吃腊八粥",
@@ -338,7 +338,7 @@
     "Id": "大口吃零食",
     "File": "大口吃零食.webm",
     "Pool": "Event",
-    "Weight": 30
+    "Weight": 100
   },
   {
     "Id": "女仆屈膝礼仪",
@@ -362,7 +362,7 @@
     "Id": "工作状态-原地踱步张望",
     "File": "工作状态-原地踱步张望.webm",
     "Pool": "Event",
-    "Weight": 1000
+    "Weight": 100
   },
   {
     "Id": "工作状态-垂头叹气冒汗",
@@ -392,7 +392,7 @@
     "Id": "工作状态-雀跃庆祝",
     "File": "工作状态-雀跃庆祝.webm",
     "Pool": "Event",
-    "Weight": 30
+    "Weight": 100
   },
   {
     "Id": "待机呼吸休闲",
@@ -492,7 +492,7 @@
     "Id": "是啊，吃什么",
     "File": "是啊，吃什么.webm",
     "Pool": "Event",
-    "Weight": 30
+    "Weight": 100
   },
   {
     "Id": "晨间刷牙",
@@ -578,7 +578,7 @@
     "Id": "碎碎念-对屏碎碎念",
     "File": "碎碎念-对屏碎碎念.webm",
     "Pool": "Event",
-    "Weight": 500
+    "Weight": 100
   },
   {
     "Id": "碎碎念-擦桌碎碎念",
@@ -628,7 +628,7 @@
     "Id": "蝴蝶蜜蜂环绕头顶开花",
     "File": "蝴蝶蜜蜂环绕头顶开花.webm",
     "Pool": "Event",
-    "Weight": 30
+    "Weight": 100
   },
   {
     "Id": "螃蟹走路",
@@ -642,7 +642,7 @@
     "Id": "被吓一跳",
     "File": "被吓一跳.webm",
     "Pool": "Event",
-    "Weight": 30
+    "Weight": 100
   },
   {
     "Id": "被落叶淹没",
@@ -699,7 +699,7 @@
     "Id": "轻快摇摆舞",
     "File": "轻快摇摆舞.webm",
     "Pool": "Event",
-    "Weight": 1000
+    "Weight": 100
   },
   {
     "Id": "骑木马",
@@ -711,7 +711,7 @@
     "Id": "鲸鱼吐泡泡特效",
     "File": "鲸鱼吐泡泡特效.webm",
     "Pool": "Event",
-    "Weight": 200
+    "Weight": 100
   },
   {
     "Id": "原地重力下蹲压缩",
@@ -723,6 +723,6 @@
     "Id": "悠闲哼歌",
     "File": "悠闲哼歌.webm",
     "Pool": "Idle",
-    "Weight": 20
+    "Weight": 100
   }
 ]

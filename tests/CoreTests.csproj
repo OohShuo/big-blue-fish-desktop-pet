@@ -6,6 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../src/AnimationSource.cs" Link="AnimationSource.cs" />
     <Compile Include="../src/CompanionAnimationPolicy.cs" Link="CompanionAnimationPolicy.cs" />
     <Compile Include="../src/CompanionPreferences.cs" Link="CompanionPreferences.cs" />
     <Compile Include="../src/CompanionMedia.cs" Link="CompanionMedia.cs" />

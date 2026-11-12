@@ -18,6 +18,7 @@ internal sealed class LinuxVideoPlayer(Image image) : IDisposable
     internal double PositionSeconds { get; private set; }
     internal string Backend { get; private set; } = "未运行";
     internal double LastReadMs, LastUiMs, LastCopyMs, LastShapeMs;
+    internal bool SoftwareHighDefinition { get; set; }
     internal volatile bool Paused;
     internal event Action<double>? FramePresented;
     internal event Action<byte[], int, int, bool>? PixelsPresented;
@@ -31,6 +32,7 @@ internal sealed class LinuxVideoPlayer(Image image) : IDisposable
         image.RenderTransformOrigin = new(.5, .5, RelativeUnit.Relative); image.RenderTransform = new Avalonia.Media.ScaleTransform(mirror ? -1 : 1, 1);
         double pixels = image.Width * (TopLevel.GetTopLevel(image)?.RenderScaling ?? 1);
         int width = Math.Clamp((int)Math.Ceiling((double.IsFinite(pixels) ? pixels : 640) / 128) * 128, 256, 1280);
+        bool softwareHighDefinition = SoftwareHighDefinition;
         _ = Task.Run(async () =>
         {
             try
@@ -41,7 +43,7 @@ internal sealed class LinuxVideoPlayer(Image image) : IDisposable
                     CompanionMedia.Initialize(); bool hardware = !hardwareFailed && CompanionMedia.HardwareAvailable;
                     while (true)
                     {
-                        try { await Decode(path, hardware, width, id, token, mirror, completed, startSeconds, endSeconds, rate); break; }
+                        try { await Decode(path, hardware, width, id, token, mirror, completed, startSeconds, endSeconds, rate, softwareHighDefinition); break; }
                         catch (Exception e) when (hardware && !token.IsCancellationRequested)
                         { hardwareFailed = true; hardware = false; Console.Error.WriteLine("GPU decode failed, using CPU: " + e.Message); }
                     }
@@ -52,9 +54,13 @@ internal sealed class LinuxVideoPlayer(Image image) : IDisposable
             catch (Exception e) { await Dispatcher.UIThread.InvokeAsync(() => { if (id == generation && !disposed) Failed?.Invoke(e.Message); }); }
         });
     }
-    async Task Decode(string file, bool hardware, int width, long id, CancellationToken token, bool mirror, Action completed, double start, double? end, double rate)
+    async Task Decode(string file, bool hardware, int width, long id, CancellationToken token, bool mirror, Action completed, double start, double? end, double rate, bool softwareHighDefinition)
     {
-        if (!hardware) { file = Path.Combine(Path.GetDirectoryName(file)!, "compat", Path.GetFileName(file)); width = 640; }
+        if (!hardware)
+        {
+            var source = AnimationSource.Software(file, softwareHighDefinition);
+            file = source.File; width = source.Width;
+        }
         int height = width * 9 / 16;
         using var stream = new CompanionMediaStream(file, hardware, width, height, start, end, rate);
         Backend = stream.Description; stream.SetPaused(Paused); bool wasPaused = Paused; long count = 0; byte[] pixels = new byte[width * height * 4];
