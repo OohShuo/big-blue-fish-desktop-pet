@@ -1,2 +1,2 @@
 #!/bin/sh
-exec python tools/Check-Attribution.py --pre-push
+exec python .githooks/check-attribution.py --pre-push

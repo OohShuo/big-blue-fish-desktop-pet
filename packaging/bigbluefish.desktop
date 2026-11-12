@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=蓝色大肥鱼
+Name[en]=Big Blue Fish
+Comment=Animated desktop companion
+Exec=/usr/bin/bigbluefish
+Icon=bigbluefish
+Terminal=false
+Categories=Game;Utility;
+StartupNotify=false

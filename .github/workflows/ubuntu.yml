@@ -1,0 +1,46 @@
+name: Ubuntu
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: System dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y make python3 dpkg-dev gstreamer1.0-tools \
+            gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
+            libx11-6 libxext6 libxi6 libxcursor1 libxrandr2 libxrender1 libice6 libsm6 \
+            libfontconfig1 libfreetype6 libdbus-1-3 fonts-noto-cjk xvfb x11-utils imagemagick libxtst6
+      - run: make configure
+      - run: make test
+      - run: make test-ui
+      - name: Check installation layout
+        run: |
+          make install DESTDIR="$PWD/build/install-test"
+          test -x build/install-test/opt/bigbluefish/bigbluefish
+          make uninstall DESTDIR="$PWD/build/install-test"
+          test ! -e build/install-test/opt/bigbluefish
+      - run: make pack
+      - name: Validate Debian dependencies and executable
+        run: |
+          sudo apt-get install -y ./dist/*.deb
+          test -x /opt/bigbluefish/bigbluefish
+          test -x /usr/bin/bigbluefish
+          sudo apt-get remove -y bigbluefish
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bigbluefish-${{ matrix.os }}
+          path: |
+            dist/*
+            build/ui-smoke.png
