@@ -14,7 +14,7 @@ internal sealed partial class LinuxPetWindow
         Directory.CreateDirectory(Path.GetDirectoryName(AutostartFile)!);
         string executable = Path.Combine(AppContext.BaseDirectory, "bigbluefish")
             .Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("`", "\\`").Replace("$", "\\$").Replace("%", "%%");
-        File.WriteAllText(AutostartFile, $"[Desktop Entry]\nType=Application\nName=蓝色大肥鱼\nExec=\"{executable}\"\nTerminal=false\n");
+        File.WriteAllText(AutostartFile, $"[Desktop Entry]\nType=Application\nName=蓝色大肥鱼\nComment=Ubuntu 桌面动画伴侣\nExec=\"{executable}\"\nTerminal=false\nX-GNOME-Autostart-enabled=true\n");
     }
     void OpenSettings()
     {
@@ -36,10 +36,22 @@ internal sealed partial class LinuxPetWindow
             slider.ValueChanged += (_, _) => { label.Text = $"{text}：{slider.Value:0.##}"; set(slider.Value); Save(); };
             body.Children.Add(label); body.Children.Add(slider);
         }
+        Heading("启动");
+        var startupStatus = new TextBlock { TextWrapping = TextWrapping.Wrap, Foreground = Brushes.SlateGray };
+        var startup = new CheckBox { Content = "开机自启动（登录桌面后自动运行鱼鱼）", IsChecked = StartupEnabled };
+        startup.Click += (_, _) =>
+        {
+            try { SetStartup(startup.IsChecked == true); Save(); }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            { startup.IsChecked = StartupEnabled; startupStatus.Text = "设置失败：" + error.Message; return; }
+            startupStatus.Text = StartupEnabled ? "已启用：登录桌面后自动运行。" : "已关闭。";
+        };
+        startupStatus.Text = StartupEnabled ? "已启用：登录桌面后自动运行。" : "已关闭。";
+        body.Children.Add(startup); body.Children.Add(startupStatus);
+        refreshStartupSetting = () => { startup.IsChecked = StartupEnabled; startupStatus.Text = StartupEnabled ? "已启用：登录桌面后自动运行。" : "已关闭。"; };
         Heading("桌宠与显示");
         Slider("桌宠大小（%）", Preferences.Scale * 100, 50, 200, 5, value => { Preferences.Scale = value / 100; Rescale(); Clamp(); });
         Slider("气泡大小（%）", Preferences.BubbleScale * 100, 50, 200, 5, value => { Preferences.BubbleScale = value / 100; MoveBubble(); });
-        Toggle("登录后自动启动", File.Exists(AutostartFile), SetStartup);
         Toggle("全屏时自动隐藏", Preferences.HideOnFullscreen, value =>
         {
             Preferences.HideOnFullscreen = value;
@@ -103,7 +115,7 @@ internal sealed partial class LinuxPetWindow
             Background = new SolidColorBrush(Color.FromRgb(247, 248, 251)),
             Content = new ScrollViewer { Content = new Border { Padding = new Thickness(28), Child = body } }
         };
-        settings.Closed += (_, _) => { refreshAgentSettings = null; settings = null; Save(); ResumeAutomaticIfIdle(); };
+        settings.Closed += (_, _) => { refreshAgentSettings = null; refreshStartupSetting = null; settings = null; Save(); ResumeAutomaticIfIdle(); };
         settings.Show(); settings.Activate();
     }
 }

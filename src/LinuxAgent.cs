@@ -20,6 +20,7 @@ internal sealed partial class LinuxPetWindow
     readonly Queue<string> externalActions = new();
     Window? mcpInput;
     Action? refreshAgentSettings;
+    Action? refreshStartupSetting;
     DateTime nextAgentSpeech = DateTime.MinValue;
     DateTime nextExternalAt = DateTime.MinValue;
     string? nextExternalText;
@@ -387,6 +388,7 @@ internal sealed partial class LinuxPetWindow
         if (values.TryGetValue("Left", out var left) && left is double x) position = new((int)x, position.Y);
         if (values.TryGetValue("Top", out var top) && top is double y) position = new(position.X, (int)y);
         Rescale(); Clamp(position); MoveBubble(); ResetDwell(); Save();
+        refreshStartupSetting?.Invoke();
         ConfigureAgent();
         if (AgentDailyActive && !Puppet) nextAgentSpeech = DateTime.UtcNow.Add(Preferences.NextSpeechDelay(random));
         ResumeAutomaticIfIdle(); refreshAgentSettings?.Invoke();

@@ -53,6 +53,7 @@ builder.AfterSetup(_ => DispatcherTimer.RunOnce(async () =>
         var boxes = settingsWindow.GetLogicalDescendants().OfType<CheckBox>().Select(x => x.Content?.ToString() ?? "").ToArray();
         Check(labels.Any(x => x == "连接 Agent"), "Agent settings section is present");
         Check(boxes.Contains("点击时让 Agent 回应") && boxes.Contains("拖动结束时让 Agent 回应"), "Click and drag response switches are present");
+        Check(boxes.Contains("开机自启动（登录桌面后自动运行鱼鱼）"), "Autostart switch is present");
         Check(labels.Any(x => x == "固定天气地区") && boxes.Contains("天气变化时让 Agent 提醒"), "Weather settings are present");
         Check(labels.Any(x => x == "记忆与提醒") && labels.Any(x => x == "长期记忆") && labels.Any(x => x == "提醒"), "Memory and reminder settings are present");
         settingsWindow.Close();
