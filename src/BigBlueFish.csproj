@@ -17,6 +17,9 @@
     <PackageReference Include="Avalonia.Skia" Version="12.1.4" />
     <PackageReference Include="Avalonia.HarfBuzz" Version="12.1.4" />
     <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.4" />
+    <PackageReference Include="SkiaSharp" Version="3.119.4" />
+    <EmbeddedResource Include="Agent/Skills/SKILL.md" LogicalName="BigBlueFish.Agent.Skills.SKILL.md" />
+    <EmbeddedResource Include="Agent/Skills/persona.md" LogicalName="BigBlueFish.Agent.Skills.persona.md" />
     <AvaloniaResource Include="../assets/LemiXiaoNaiPaoTi.ttf" Link="Assets/LemiXiaoNaiPaoTi.ttf" />
     <Content Include="../assets/fish/**/*" Link="assets/fish/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="../assets/bigbluefish.ico" Link="assets/bigbluefish.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />

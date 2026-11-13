@@ -9,9 +9,24 @@ internal static class Program
     [STAThread]
     public static void Main(string[] args)
     {
-        var directory = Environment.GetEnvironmentVariable("BIGBLUEFISH_DATA") ?? Path.Combine(
+        if (args.Contains("--mcp-bridge"))
+        {
+            int index = Array.IndexOf(args, "--pipe");
+            if (index < 0 || index + 1 >= args.Length)
+            {
+                Console.Error.WriteLine("缺少内部工具管道名。");
+                Environment.ExitCode = 1;
+                return;
+            }
+            Environment.ExitCode = McpBridge.RunAsync(args[index + 1]).GetAwaiter().GetResult();
+            return;
+        }
+        string? explicitData = null;
+        int dataIndex = Array.IndexOf(args, "--data-dir");
+        if (dataIndex >= 0 && dataIndex + 1 < args.Length) explicitData = args[dataIndex + 1];
+        var directory = explicitData ?? Environment.GetEnvironmentVariable("BIGBLUEFISH_DATA") ?? Path.Combine(
             Environment.GetEnvironmentVariable("XDG_DATA_HOME") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local/share"), "bigbluefish");
-        Directory.CreateDirectory(directory); Environment.CurrentDirectory = directory;
+        directory = Path.GetFullPath(directory); Directory.CreateDirectory(directory); Environment.CurrentDirectory = directory;
         Build().StartWithClassicDesktopLifetime(args);
     }
     public static AppBuilder Build() => AppBuilder.Configure<App>().UseX11().UseSkia().UseHarfBuzz()

@@ -1,23 +1,37 @@
 using BigBlueFish;
 using System.Text.Json;
 
-int checks = 0;
+if (args.Contains("--mcp-bridge"))
+{
+    int pipeIndex = Array.IndexOf(args, "--pipe");
+    if (pipeIndex < 0 || pipeIndex + 1 >= args.Length) { Environment.ExitCode = 1; return; }
+    Environment.ExitCode = McpBridge.RunAsync(args[pipeIndex + 1]).GetAwaiter().GetResult();
+    return;
+}
+
+int checks = GestureTests.Run() + await AgentTests.Run();
 void Check(bool condition, string message) { if (!condition) throw new Exception(message); checks++; }
 var assets = Path.GetFullPath(args[0]);
 var policy = CompanionAnimationPolicy.Load(assets);
 Check(policy.Rules.Count == 106, "All animations retained");
+foreach (var kind in Enum.GetValues<PetGesture>())
+{
+    var response = PetGestureResponse.For(kind);
+    Check(!string.IsNullOrWhiteSpace(response.Text), "Every gesture has feedback");
+    if (response.Action != null) Check(policy.Find(response.Action).Pool != "Disabled", "Gesture never uses disabled action");
+}
 Check(policy.FestivalDistance(new DateTime(2026, 2, 17), "SpringFestival") == 0, "Lunar New Year");
 Check(policy.FestivalDistance(new DateTime(2026, 12, 25), "Christmas") == 0, "Christmas");
 Check(CompanionAnimationPolicy.Season(new DateTime(2026, 7, 1)) == "Summer", "Summer");
 var random = new Random(42);
 foreach (var month in Enumerable.Range(1, 12))
-foreach (var hour in new[] { 0, 8, 12, 18, 23 })
-foreach (var pool in new[] { "Idle", "Click", "Event", "Automatic" })
-{
-    var context = new CompanionAnimationContext(new DateTime(2026, month, 15, hour, 20, 0));
-    var chosen = policy.Choose(pool, context, random);
-    Check((pool == "Automatic" ? chosen.Pool is "Idle" or "Event" : chosen.Pool == pool) && policy.Weight(chosen, context) > 0, "Valid weighted selection");
-}
+    foreach (var hour in new[] { 0, 8, 12, 18, 23 })
+        foreach (var pool in new[] { "Idle", "Click", "Event", "Automatic" })
+        {
+            var context = new CompanionAnimationContext(new DateTime(2026, month, 15, hour, 20, 0));
+            var chosen = policy.Choose(pool, context, random);
+            Check((pool == "Automatic" ? chosen.Pool is "Idle" or "Event" : chosen.Pool == pool) && policy.Weight(chosen, context) > 0, "Valid weighted selection");
+        }
 var meal = new CompanionAnimationRule { Meal = "Breakfast", MealBoost = 50, Weight = 10 };
 Check(policy.Weight(meal, new(new DateTime(2026, 1, 1, 8, 0, 0))) == 60, "Breakfast boost");
 Check(policy.Weight(meal, new(new DateTime(2026, 1, 1, 15, 0, 0))) == 10, "Outside meal");
@@ -48,15 +62,18 @@ try
 {
     Environment.CurrentDirectory = temporary;
     Check(CompanionPreferences.Read().Scale == 1, "Default settings");
+    Check(CompanionPreferences.Read().MouseInteractions, "Gestures enabled by default");
     Check(!CompanionPreferences.Read().SoftwareHighDefinition, "Default software quality stays low");
     File.WriteAllText("preferences.json", "{\"Scale\":99,\"LowPowerIdleSeconds\":-5,\"BreakfastHour\":40,\"ModelEnabled\":true}");
     var preferences = CompanionPreferences.Read();
     Check(preferences.Scale == 2 && preferences.LowPowerIdleSeconds == 3, "Clamp legacy settings");
+    preferences.MouseInteractions = false;
     preferences.SoftwareHighDefinition = true;
     preferences.LowPowerAnimation = true;
     preferences.Save(); preferences.Save();
-    Check(!File.ReadAllText("preferences.json").Contains("Model"), "Legacy fields dropped on save");
+    Check(!File.ReadAllText("preferences.json").Contains("ModelEnabled"), "Legacy fields dropped on save");
     Check(CompanionPreferences.Read().BreakfastHour == 23, "Meal settings remain available");
+    Check(!CompanionPreferences.Read().MouseInteractions, "Gesture preference persists");
     Check(CompanionPreferences.Read().SoftwareHighDefinition, "Software quality persists");
     File.WriteAllText("preferences.json", "broken");
     Check(CompanionPreferences.Read().LowPowerAnimation, "Backup recovery");

@@ -18,13 +18,15 @@ jobs:
       - name: System dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y make python3 dpkg-dev gstreamer1.0-tools \
+          sudo apt-get install -y make python3 dpkg-dev systemd dbus-user-session libnotify-bin gstreamer1.0-tools \
             gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
-            libx11-6 libxext6 libxi6 libxcursor1 libxrandr2 libxrender1 libice6 libsm6 \
-            libfontconfig1 libfreetype6 libdbus-1-3 fonts-noto-cjk xvfb x11-utils imagemagick libxtst6
+            libx11-6 libxext6 libxcomposite1 libxi6 libxcursor1 libxrandr2 libxrender1 libice6 libsm6 \
+            libfontconfig1 libfreetype6 libdbus-1-3 fonts-noto-cjk xvfb x11-utils imagemagick libxtst6 xauth
       - run: make configure
       - run: make test
       - run: make test-ui
+      - run: make test-agent
+      - run: make test-interactions
       - name: Check installation layout
         run: |
           make install DESTDIR="$PWD/build/install-test"

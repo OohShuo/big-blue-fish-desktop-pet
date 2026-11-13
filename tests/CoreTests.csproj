@@ -6,9 +6,19 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Remove="ui/**/*.cs" />
+    <Compile Include="../src/Agent/**/*.cs" Link="Agent/%(RecursiveDir)%(Filename)%(Extension)" />
+    <Compile Include="../src/Control/*.cs" Link="Control/%(Filename)%(Extension)" />
+    <Compile Include="../src/Diagnostics/*.cs" Link="Diagnostics/%(Filename)%(Extension)" />
+    <Compile Include="../src/GlobalDiagnostics.cs" Link="GlobalDiagnostics.cs" />
+    <Compile Include="../src/McpBridge.cs" Link="McpBridge.cs" />
+    <Compile Include="../src/PetGestureResponse.cs" Link="PetGestureResponse.cs" />
+    <Compile Include="../src/PetGestureRecognizer.cs" Link="PetGestureRecognizer.cs" />
     <Compile Include="../src/AnimationSource.cs" Link="AnimationSource.cs" />
     <Compile Include="../src/CompanionAnimationPolicy.cs" Link="CompanionAnimationPolicy.cs" />
     <Compile Include="../src/CompanionPreferences.cs" Link="CompanionPreferences.cs" />
     <Compile Include="../src/CompanionMedia.cs" Link="CompanionMedia.cs" />
+    <EmbeddedResource Include="../src/Agent/Skills/SKILL.md" LogicalName="BigBlueFish.Agent.Skills.SKILL.md" />
+    <EmbeddedResource Include="../src/Agent/Skills/persona.md" LogicalName="BigBlueFish.Agent.Skills.persona.md" />
   </ItemGroup>
 </Project>

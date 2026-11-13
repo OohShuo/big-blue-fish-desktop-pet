@@ -1,7 +1,7 @@
 using System.Runtime.InteropServices;
 namespace BigBlueFish;
 
-internal static class CompanionNative
+internal static partial class CompanionNative
 {
     static readonly object gate = new();
     static readonly IntPtr display = XOpenDisplay(IntPtr.Zero);
@@ -34,6 +34,13 @@ internal static class CompanionNative
             return window != IntPtr.Zero && Integers((ulong)window.ToInt64(), "_NET_WM_STATE").Contains(Atom("_NET_WM_STATE_FULLSCREEN"));
         }
     }
+    internal static bool TryGetPointer(out int x, out int y, out uint buttons)
+    {
+        x = y = 0; buttons = 0;
+        if (display == IntPtr.Zero) return false;
+        lock (gate) return XQueryPointer(display, Root, out _, out _, out x, out y, out _, out _, out buttons) != 0;
+    }
+    [DllImport("libX11.so.6")] static extern int XQueryPointer(IntPtr display, ulong window, out ulong root, out ulong child, out int rootX, out int rootY, out int windowX, out int windowY, out uint mask);
     internal static void SetInputShape(IntPtr window, byte[] pixels, int width, int height, double scale, bool mirror)
     {
         if (display == IntPtr.Zero || window == IntPtr.Zero) return;

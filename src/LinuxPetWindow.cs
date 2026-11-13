@@ -19,6 +19,7 @@ internal sealed partial class LinuxPetWindow : Window
     readonly TextBlock bubbleText = new() { TextWrapping = TextWrapping.Wrap };
     readonly LinuxBubble bubbleFrame;
     readonly Mutex mutex;
+    IPointer? capturedPointer;
     string phase = "Startup", fullText = "";
     DateTime bubbleUntil = DateTime.MaxValue;
     bool closed, exitReady, hidden, fullscreenHidden, dragging, dragged, greetingNoticeActive;
@@ -27,7 +28,8 @@ internal sealed partial class LinuxPetWindow : Window
     CompanionAnimationRule? moveRule;
     bool moveMirrored;
     Window? settings;
-    bool animationActive;
+    bool animationActive, exitRequested;
+    (CompanionAnimationRule Rule, string Phase, bool Mirror, string? Text)? pendingPlayback;
     CancellationTokenSource? lowPowerHold;
     static readonly IBrush Hair = new SolidColorBrush(Color.FromRgb(80, 96, 152));
     double SpriteSize => 280 * Preferences.Scale;
@@ -42,7 +44,7 @@ internal sealed partial class LinuxPetWindow : Window
         player = new(sprite); player.FramePresented += MoveWithAnimation;
         PositionChanged += (_, _) => MoveBubble();
         player.PixelsPresented += (pixels, width, height, mirror) => CompanionNative.SetInputShape(TryGetPlatformHandle()?.Handle ?? IntPtr.Zero, pixels, width, height, Width * DesktopScaling / width, mirror);
-        player.Failed += error => { animationActive = false; Console.Error.WriteLine(error); if (phase == "Exit") CloseImmediately(); };
+        player.Failed += error => { animationActive = false; Console.Error.WriteLine(error); if (exitRequested || phase == "Exit") CloseImmediately(); };
         bubbleText.FontFamily = new FontFamily("avares://bigbluefish/Assets#LemiXiaoNaiPaoTi");
         bubbleText.Foreground = Hair;
         var close = new Button { Content = "×", Padding = new Thickness(3), HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right, VerticalAlignment = Avalonia.Layout.VerticalAlignment.Top, Background = Brushes.Transparent, BorderThickness = new Thickness(0) };
@@ -67,50 +69,73 @@ internal sealed partial class LinuxPetWindow : Window
         Opened += (_, _) =>
         {
             Play(policy.Find("女仆屈膝礼仪"), "Startup"); Welcome();
-            InitializeTray(); timer.Start();
+            InitializeMcp(); InitializeTray(); timer.Start();
         };
         PointerPressed += (_, e) =>
         {
-            if (phase == "Exit") { e.Handled = true; return; }
+            if (exitRequested || phase == "Exit") { e.Handled = true; return; }
             var point = e.GetCurrentPoint(this);
-            if (point.Properties.IsRightButtonPressed) { OpenMenu(); e.Handled = true; return; }
+            if (point.Properties.IsRightButtonPressed) { CancelGestureInput(); PublishInteraction("click", new { button = "right", Position.X, Position.Y }); OpenMenu(); e.Handled = true; return; }
             if (!point.Properties.IsLeftButtonPressed) return;
             dragging = true; dragged = false; moveRule = null; windowOrigin = Position;
             var screenPoint = this.PointToScreen(point.Position); dragOrigin = screenPoint;
+            dragReaction = null;
+            if (Preferences.MouseInteractions) gestures.Press(GestureScreen(screenPoint), Environment.TickCount64);
+            capturedPointer = e.Pointer;
             e.Pointer.Capture(this); e.Handled = true;
         };
         PointerMoved += (_, e) =>
         {
-            if (phase == "Exit") return;
+            if (exitRequested || phase == "Exit") return;
             if (!dragging) return;
             var screenPoint = this.PointToScreen(e.GetPosition(this)); int dx = screenPoint.X - dragOrigin.X, dy = screenPoint.Y - dragOrigin.Y;
             if (!dragged && Math.Abs(dx) + Math.Abs(dy) > 4 * DesktopScaling)
             {
-                dragged = true; Play(policy.Find("被鼠标拖拽悬空反馈"), "Drag");
+                dragged = true; PublishInteraction("drag_start", new { Position.X, Position.Y }); if (!Puppet) Play(policy.Find("被鼠标拖拽悬空反馈"), "Drag");
             }
             Position = new(windowOrigin.X + dx, windowOrigin.Y + dy); MoveBubble();
+            if (Preferences.MouseInteractions) HandleHeldGesture(gestures.MoveDrag(GestureScreen(screenPoint), Environment.TickCount64, dragged));
         };
         PointerReleased += (_, e) =>
         {
-            if (phase == "Exit") return;
-            if (!dragging) return; dragging = false; e.Pointer.Capture(null); Clamp(); Save();
-            if (dragged) { QueueAutomatic(); }
+            if (exitRequested || phase == "Exit") return;
+            if (!dragging) return;
+            if (pendingPlayback?.Phase == "Drag") pendingPlayback = null;
+            bool suppressClick = false;
+            var feedback = Preferences.MouseInteractions ? gestures.Release(Environment.TickCount64, dragged, out suppressClick) : null;
+            var reaction = dragReaction; dragReaction = null;
+            var releasedPoint = this.PointToScreen(e.GetPosition(this));
+            long clickAt = Environment.TickCount64;
+            bool twice = !dragged && Preferences.AgentEnabled && lastClickAt != 0 && clickAt - lastClickAt <= 500
+                && Math.Abs(releasedPoint.X - lastClickPoint.X) + Math.Abs(releasedPoint.Y - lastClickPoint.Y) <= 8;
+            dragging = false; capturedPointer = null; e.Pointer.Capture(null); Clamp(); Save();
+            if (dragged) { lastClickAt = 0; PublishInteraction("drag_end", new { Position.X, Position.Y, cancelled = false }); QueueAutomatic(); }
+            else if (twice && TryOpenMcpInput()) { lastClickAt = 0; PublishInteraction("click", new { button = "left", count = 2, Position.X, Position.Y }); }
             else
             {
-                Play(policy.Choose("Click", Context(), random), "Click");
+                PublishInteraction("click", new { button = "left", Position.X, Position.Y });
+                lastClickAt = clickAt; lastClickPoint = releasedPoint;
+                if (reaction != null) PlayGesture(reaction.Value);
+                else if (feedback != null) PlayGesture(feedback.Value);
+                else if (!suppressClick && !Puppet) Play(policy.Choose("Click", Context(), random), "Click");
+                else if (!animationActive) QueueAutomatic();
             }
             e.Handled = true;
         };
-        PointerCaptureLost += (_, _) => { if (dragging) { dragging = false; QueueAutomatic(); } };
+        PointerCaptureLost += (_, _) =>
+        {
+            // Normal button release already ended the press; keep its poke history.
+            if (dragging) { if (dragged) PublishInteraction("drag_end", new { Position.X, Position.Y, cancelled = true }); CancelGestureInput(); QueueAutomatic(); }
+        };
         Closing += (_, e) =>
         {
             Save();
             if (exitReady || closed) return;
-            e.Cancel = true; if (phase == "Exit") return;
-            dragging = false; moveRule = null; settings?.Close(); hidden = false; fullscreenHidden = false; Show(); player.Paused = false;
-            Play(policy.Find("女仆屈膝礼仪"), "Exit"); ShowText("主人再见~鱼鱼喜欢主人哦");
+            e.Cancel = true; if (exitRequested || phase == "Exit") return;
+            mcpInput?.Close(); CancelGestureInput(); dragging = false; moveRule = null; settings?.Close(); hidden = false; fullscreenHidden = false; Show(); player.Paused = false;
+            RequestPlayback(policy.Find("女仆屈膝礼仪"), "Exit", false, "主人再见~鱼鱼喜欢主人哦");
         };
-        Closed += (_, _) => { CancelLowPowerHold(); closed = true; timer.Stop(); player.Dispose(); bubbleWindow.Close(); settings?.Close(); Save(); mutex.Dispose(); (Avalonia.Application.Current!.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)!.Shutdown(); };
+        Closed += (_, _) => { StopMcp(); CancelLowPowerHold(); closed = true; timer.Stop(); player.Dispose(); bubbleWindow.Close(); settings?.Close(); Save(); mutex.Dispose(); (Avalonia.Application.Current!.ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)!.Shutdown(); };
         timer.Tick += (_, _) => Tick();
     }
     CompanionAnimationContext Context() => new(DateTime.Now, BreakfastHour: Preferences.BreakfastHour, LunchHour: Preferences.LunchHour, DinnerHour: Preferences.DinnerHour);
@@ -129,29 +154,47 @@ internal sealed partial class LinuxPetWindow : Window
     }
     void Save() { if (closed) return; Preferences.Left = Position.X; Preferences.Top = Position.Y; Preferences.Save(); }
     void Play(CompanionAnimationRule rule, string nextPhase, bool mirror = false)
+        => RequestPlayback(rule, nextPhase, mirror, null);
+    void RequestPlayback(CompanionAnimationRule rule, string nextPhase, bool mirror, string? text)
     {
-        if (closed) return;
+        if (closed || (exitRequested && nextPhase != "Exit")) return;
+        if (nextPhase == "Exit") exitRequested = true;
         CancelLowPowerHold();
-        animationActive = true;
+        if (animationActive || (dragging && dragged && nextPhase is not ("Drag" or "Exit")))
+        {
+            pendingPlayback = (rule, nextPhase, mirror, text);
+            return;
+        }
+        pendingPlayback = null;
+        StartPlayback(rule, nextPhase, mirror, text);
+    }
+    void StartPlayback(CompanionAnimationRule rule, string nextPhase, bool mirror, string? text)
+    {
+        if (nextPhase is "Gesture" or "Chat" or "External" or "PuppetIdle" or "Click" or "Drag" or "Exit") moveRule = null;
+        animationActive = true; currentAction = rule.Id;
         if (phase == "Startup" && nextPhase != "Startup") EndWelcome();
 
         phase = nextPhase;
+        if (text != null) ShowText(text);
         player.SoftwareHighDefinition = Preferences.SoftwareHighDefinition;
         player.Play(Path.Combine(AppContext.BaseDirectory, "assets/fish", rule.File), mirror, Finished,
-            nextPhase == "Drag" ? 1.5 : 0, nextPhase == "Drag" ? 6 : null, rule.Pool == "Greeting" ? 1.5 : 1);
+            rate: rule.Pool == "Greeting" ? 1.5 : 1);
     }
     void QueueAutomatic()
     {
-        if (closed || phase == "Exit" || dragging || hidden || fullscreenHidden || settings != null) return;
-        if (!Preferences.LowPowerAnimation) { PlayAutomatic(); return; }
+        if (closed || exitRequested || phase == "Exit" || dragging || hidden || fullscreenHidden || settings != null) return;
         if (animationActive) return;
+        if (TryPlayExternal() || TryPlayPending()) return;
+        if (Puppet) { Play(policy.Find("待机呼吸休闲"), "PuppetIdle"); return; }
+        if (!Preferences.LowPowerAnimation) { PlayAutomatic(); return; }
         ScheduleLowPowerPause();
     }
     void PlayAutomatic()
     {
-        if (closed || phase == "Exit" || dragging || hidden || fullscreenHidden || settings != null) return;
+        if (closed || exitRequested || phase == "Exit" || dragging || hidden || fullscreenHidden || settings != null) return;
         var now = DateTime.Now;
-        if (now.Hour == 23 && Preferences.LastBrushDate != now.ToString("yyyy-MM-dd")) {
+        if (now.Hour == 23 && Preferences.LastBrushDate != now.ToString("yyyy-MM-dd"))
+        {
             Preferences.LastBrushDate = now.ToString("yyyy-MM-dd"); Save();
             Play(policy.Find("晨间刷牙"), "Daily"); return;
         }
@@ -187,7 +230,20 @@ internal sealed partial class LinuxPetWindow : Window
     {
         if (closed || animationActive || dragging || hidden || fullscreenHidden || settings != null || phase == "Exit") return;
         CancelLowPowerHold();
+        if (TryPlayExternal() || TryPlayPending()) return;
+        if (Puppet) { Play(policy.Find("待机呼吸休闲"), "PuppetIdle"); return; }
         PlayAutomatic();
+    }
+    bool TryPlayPending()
+    {
+        if (pendingPlayback == null || animationActive) return false;
+        var next = pendingPlayback.Value;
+        if (next.Phase != "Exit" && (hidden || fullscreenHidden || settings != null)) return false;
+        if (next.Phase == "Drag" && !dragging) { pendingPlayback = null; return false; }
+        if (next.Phase != "Exit" && next.Phase != "Drag" && dragging && dragged) return false;
+        pendingPlayback = null;
+        StartPlayback(next.Rule, next.Phase, next.Mirror, next.Text);
+        return true;
     }
     void Finished()
     {
@@ -195,11 +251,12 @@ internal sealed partial class LinuxPetWindow : Window
 
         if (closed) return;
         if (phase == "Exit") { CloseImmediately(); return; }
+        if (phase == "Startup") EndWelcome();
         if (phase == "Drag") { if (!dragging) QueueAutomatic(); return; }
         if (phase == "Outbound" && moveRule != null) { Position = new((int)moveEnd, Position.Y); Play(policy.Choose("Idle", Context(), random), "BetweenMoves"); return; }
         if (phase == "BetweenMoves" && moveRule != null) { moveStart = Position.X; moveEnd = moveOrigin.X; Play(moveRule, "Return", !moveMirrored); return; }
         if (phase == "Return") { Position = new(moveOrigin.X, Position.Y); moveRule = null; }
-        if (phase == "Startup") EndWelcome();
+        if (TryPlayExternal() || TryPlayPending()) return;
         if (dragging || hidden || fullscreenHidden || settings != null) return;
         QueueAutomatic();
     }
@@ -227,6 +284,7 @@ internal sealed partial class LinuxPetWindow : Window
     void EndWelcome() { if (greetingNoticeActive) bubbleWindow.Hide(); greetingNoticeActive = false; }
     void ShowText(string text)
     {
+        StopTyping();
         greetingNoticeActive = false;
         fullText = text; bubbleText.Text = text;
         ResetDwell();
@@ -272,21 +330,27 @@ internal sealed partial class LinuxPetWindow : Window
     }
     void Tick()
     {
-        if (closed || phase == "Exit") return;
+        if (closed || exitRequested || phase == "Exit") return;
+        lastForeground = CompanionNative.ResolveForeground(CompanionNative.GetForegroundWindow(), lastForeground);
         bool full = Preferences.HideOnFullscreen && CompanionNative.IsFullscreen();
-        if (full && !fullscreenHidden && !hidden) { fullscreenHidden = true; Hide(); bubbleWindow.Hide(); }
+        if (full && !fullscreenHidden && !hidden) { fullscreenHidden = true; CancelGestureInput(); Hide(); bubbleWindow.Hide(); }
         else if (!full && fullscreenHidden) { fullscreenHidden = false; if (!hidden) { Show(); Clamp(); ResumeAutomaticIfIdle(); } }
         player.Paused = hidden || fullscreenHidden;
         if (hidden || fullscreenHidden) return;
+        TickAgent(DateTime.Now);
+        TickTyping();
+        TickGestures();
         if (DateTime.UtcNow >= bubbleUntil) bubbleWindow.Hide();
 
     }
     void OpenMenu()
     {
+        if (exitRequested || closed) return;
         var menu = new ContextMenu();
         MenuItem Item(string title, Action action, bool available = true) { var item = new MenuItem { Header = title, IsEnabled = available }; item.Click += (_, _) => action(); return item; }
-        menu.ItemsSource = new[] { Item("设置", OpenSettings),
-            Item(hidden ? "显示桌宠" : "隐藏桌宠", () => { if (hidden) { hidden = false; player.Paused = false; Show(); Clamp(); ResumeAutomaticIfIdle(); } else { hidden = true; Hide(); bubbleWindow.Hide(); } }), Item("关闭桌宠", Close) };
+        menu.ItemsSource = new[] { Item("聊天", () => TryOpenMcpInput()), Item("吐字测试", () => _ = ManualSpeech()), Item("设置", OpenSettings),
+            Item(hidden ? "显示桌宠" : "隐藏桌宠", () => { if (hidden) { hidden = false; player.Paused = false; Show(); Clamp(); ResumeAutomaticIfIdle(); } else { hidden = true; CancelGestureInput(); Hide(); bubbleWindow.Hide(); } }), Item("关闭桌宠", Close) };
+        menu.Closed += (_, _) => ResumeAutomaticIfIdle();
         ContextMenu = menu; menu.Open(this);
     }
     void CloseImmediately() { exitReady = true; Close(); }

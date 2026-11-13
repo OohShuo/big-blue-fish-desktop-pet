@@ -14,7 +14,7 @@ command -v "$dotnet" >/dev/null || { echo 'Install .NET 10 SDK or set DOTNET=/pa
 python3 - <<'CHECK_LIBRARIES'
 import ctypes
 import sys
-for library in ('libX11.so.6', 'libXext.so.6', 'libXi.so.6', 'libXcursor.so.1',
+for library in ('libX11.so.6', 'libXext.so.6', 'libXcomposite.so.1', 'libXi.so.6', 'libXcursor.so.1',
                 'libXrandr.so.2', 'libXrender.so.1', 'libICE.so.6', 'libSM.so.6',
                 'libfontconfig.so.1', 'libfreetype.so.6', 'libdbus-1.so.3',
                 'libgstreamer-1.0.so.0', 'libgstapp-1.0.so.0'):

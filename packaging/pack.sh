@@ -17,11 +17,11 @@ Priority: optional
 Architecture: amd64
 Maintainer: shuo <shuo@localhost>
 Installed-Size: $size
-Depends: libc6 (>= 2.35), libstdc++6, libgcc-s1, libssl3 | libssl3t64, libicu70 | libicu74, libfontconfig1, libfreetype6, libx11-6, libxext6, libxi6, libxcursor1, libxrandr2, libxrender1, libice6, libsm6, libdbus-1-3, libgstreamer1.0-0 (>= 1.20), libgstreamer-plugins-base1.0-0, gstreamer1.0-plugins-base, gstreamer1.0-plugins-good, gstreamer1.0-plugins-bad, fonts-noto-cjk
+Depends: libc6 (>= 2.35), libstdc++6, libgcc-s1, libssl3 | libssl3t64, libicu70 | libicu74, libfontconfig1, libfreetype6, libx11-6, libxext6, libxcomposite1, libxi6, libxcursor1, libxrandr2, libxrender1, libice6, libsm6, libdbus-1-3, libgstreamer1.0-0 (>= 1.20), libgstreamer-plugins-base1.0-0, gstreamer1.0-plugins-base, gstreamer1.0-plugins-good, gstreamer1.0-plugins-bad, fonts-noto-cjk
 Conflicts: bigbluefish-safe, bigbluefish-safe-nomodel
 Replaces: bigbluefish-safe, bigbluefish-safe-nomodel
 Description: Big Blue Fish animated desktop companion
- Transparent desktop animations with click, drag, calendar events and tray settings.
+ Desktop animations with ACP chat for Claude Code, Codex CLI and OpenCode.
  Built for Ubuntu 22.04 and 24.04 amd64.
 CONTROL
 for script in postinst postrm; do

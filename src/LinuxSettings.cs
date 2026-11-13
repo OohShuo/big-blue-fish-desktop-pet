@@ -18,6 +18,8 @@ internal sealed partial class LinuxPetWindow
     }
     void OpenSettings()
     {
+        if (exitRequested || closed) return;
+        CancelGestureInput();
         if (settings != null) { settings.WindowState = WindowState.Normal; settings.Activate(); return; }
         var body = new StackPanel { Spacing = 10 };
         void Heading(string text) => body.Children.Add(new TextBlock { Text = text, FontSize = 21, FontWeight = FontWeight.SemiBold, Margin = new Thickness(0, 14, 0, 4) });
@@ -48,20 +50,35 @@ internal sealed partial class LinuxPetWindow
         duration.SelectionChanged += (_, _) => { if (duration.SelectedIndex < 0) return; Preferences.BubbleDurationIndex = duration.SelectedIndex; ResetDwell(); Save(); };
         body.Children.Add(duration);
         body.Children.Add(new TextBlock { Text = "软件解码画质" });
-        var quality = new ComboBox {
+        var quality = new ComboBox
+        {
             ItemsSource = new[] { "低清（640×360，24 帧）", "高清（1280×720，60 帧）" },
             SelectedIndex = Preferences.SoftwareHighDefinition ? 1 : 0,
             HorizontalAlignment = HorizontalAlignment.Stretch
         };
-        quality.SelectionChanged += (_, _) => {
+        quality.SelectionChanged += (_, _) =>
+        {
             if (quality.SelectedIndex < 0) return;
             Preferences.SoftwareHighDefinition = quality.SelectedIndex == 1;
             Save();
         };
         body.Children.Add(quality);
-        body.Children.Add(new TextBlock {
+        body.Children.Add(new TextBlock
+        {
             Text = "下一个动作起生效。高清软件解码会增加 CPU 占用；硬件解码始终使用高清素材。",
-            TextWrapping = TextWrapping.Wrap, Foreground = Brushes.SlateGray
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = Brushes.SlateGray
+        });
+        Heading("鼠标互动");
+        Toggle("开启趣味鼠标互动", Preferences.MouseInteractions, value =>
+        {
+            Preferences.MouseInteractions = value; gestures = new(); dragReaction = null;
+        });
+        body.Children.Add(new TextBlock
+        {
+            Text = "慢慢摸头、快速挠尾巴、连续戳戳、长按、拎着不放或来回甩动，都能得到不同回应。生气后可以摸头安抚。",
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = Brushes.SlateGray
         });
         Heading("动作与作息");
         Toggle("低功耗动画（播放后暂停解码）", Preferences.LowPowerAnimation, value => { Preferences.LowPowerAnimation = value; if (!value) { CancelLowPowerHold(); ResumeAutomaticIfIdle(); } });
@@ -69,6 +86,8 @@ internal sealed partial class LinuxPetWindow
         Slider("早餐时间（时）", Preferences.BreakfastHour, 0, 23, 1, value => Preferences.BreakfastHour = (int)value);
         Slider("午餐时间（时）", Preferences.LunchHour, 0, 23, 1, value => Preferences.LunchHour = (int)value);
         Slider("晚餐时间（时）", Preferences.DinnerHour, 0, 23, 1, value => Preferences.DinnerHour = (int)value);
+        BuildAgentSettings(body);
+        BuildMemoryReminderSettings(body);
         Heading("关于");
         body.Children.Add(new TextBlock { Text = "蓝色大肥鱼 " + typeof(LinuxPetWindow).Assembly.GetName().Version!.ToString(3) + "\nUbuntu 桌面动画伴侣", TextWrapping = TextWrapping.Wrap });
         settings = new Window
@@ -84,7 +103,7 @@ internal sealed partial class LinuxPetWindow
             Background = new SolidColorBrush(Color.FromRgb(247, 248, 251)),
             Content = new ScrollViewer { Content = new Border { Padding = new Thickness(28), Child = body } }
         };
-        settings.Closed += (_, _) => { settings = null; Save(); ResumeAutomaticIfIdle(); };
+        settings.Closed += (_, _) => { refreshAgentSettings = null; settings = null; Save(); ResumeAutomaticIfIdle(); };
         settings.Show(); settings.Activate();
     }
 }
